@@ -1,6 +1,6 @@
 import cv2
 import mediapipe as mp
-import pyvjoy
+import vgamepad as vg
 cam=cv2.VideoCapture(1)
 hands = mp.solutions.hands.Hands(
     static_image_mode = False,
@@ -15,8 +15,10 @@ calibrating = False
 steering=0
 left_limit = 0.33
 right_limit = 0.36
-print(pyvjoy.HID_USAGE_X)
-j = pyvjoy.VJoyDevice(1)
+throttle=0.12
+brake=-0.12
+
+gamepad = vg.VX360Gamepad()
 mp_draw = mp.solutions.drawing_utils
 while True:
     if cam.isOpened():
@@ -31,6 +33,8 @@ while True:
                 mp.solutions.hands.HAND_CONNECTIONS
                 )
                 palm = hand_landmarks.landmark[9]
+                thumb=hand_landmarks.landmark[4]
+                thumb_mcp=hand_landmarks.landmark[2]
                 if calibrating:
                     samples.append(palm.x)
                 if len(samples)>=30:
@@ -43,6 +47,17 @@ while True:
                 
                 
                 offset = palm.x - center
+                thumb_offset=thumb_mcp.y-thumb.y
+                if thumb_offset>throttle:
+                    gamepad.right_trigger_float(value_float=1.0)
+                    gamepad.left_trigger_float(value_float=0.0)
+                elif thumb_offset<-0.12:
+                    gamepad.right_trigger_float(value_float=0.0)
+                    gamepad.left_trigger_float(value_float=1.0)
+                else:
+                    gamepad.right_trigger_float(value_float=0.0)
+                    gamepad.left_trigger_float(value_float=0.0)
+                
                 
                 if abs(offset)<dead_zone:
                     offset=0
@@ -52,8 +67,11 @@ while True:
                 else:
                     steering=offset/right_limit
                 steering = max(-1, min(1, steering))
-                axis = int((steering + 1) * 32767.5)
-            j.set_axis(pyvjoy.HID_USAGE_X, axis)
+                steering=-steering
+                gamepad.left_joystick_float(x_value_float=steering, y_value_float=0.0)
+                gamepad.update()
+                
+            
             
         dot_x = 320 + steering * 220
 
